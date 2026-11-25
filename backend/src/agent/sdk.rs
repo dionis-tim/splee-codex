@@ -19,6 +19,8 @@ use super::{
 use crate::events;
 use crate::state::AppState;
 
+mod codex;
+
 const WEB_TOOLS: [&str; 2] = ["WebSearch", "WebFetch"];
 
 pub struct Call {
@@ -163,6 +165,10 @@ async fn once(state: &AppState, run: Option<&Ctx>, call: &Call, mut prompt: Stri
         servers.insert("hiring".to_string(), hiring::server(state.db.clone(), Arc::new(crate::jobs::Boards::new()?)));
         allowed.push(hiring::JOB_OPENINGS.to_string());
         prompt.push_str(hiring::GUIDANCE);
+    }
+    if std::env::var("SPLEE_AGENT_PROVIDER").as_deref() == Ok("codex") {
+        return tokio::time::timeout(call.timeout, codex::attempt(state, run, call, prompt, servers, allowed))
+            .await.context("Splee Codex task timed out")?;
     }
     let opts = ClaudeAgentOptions::builder()
         // `tools` only picks built-in tools. MCP tools such as the X ones just need to be allowed.
